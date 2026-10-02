@@ -187,9 +187,6 @@ func (m *PushManager) deliver(ctx context.Context, delivery pushDelivery) error 
 			URL: delivery.Payload.URL, ConversationUUID: mobile.ConversationUUID(delivery.Payload.URL),
 		})
 	}
-	if m.publicKey == "" || m.privateKey == "" {
-		return nil
-	}
 	payload, err := json.Marshal(delivery.Payload)
 	if err != nil {
 		return err
