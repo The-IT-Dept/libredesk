@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/abhinavxd/libredesk/internal/mobile"
 	"hash/fnv"
 	"log"
 	"os"
@@ -132,6 +133,7 @@ type App struct {
 	userNotification   *notifier.UserNotificationManager
 	notificationPref   *notifier.PreferenceManager
 	pushNotification   *notifier.PushManager
+	mobile             *mobile.Manager
 	customAttribute    *customAttribute.Manager
 	report             *report.Manager
 	webhook            *webhook.Manager
@@ -304,6 +306,11 @@ func main() {
 	if ko.Bool("notification.email.enabled") {
 		go notificationEmailQueue.Run(ctx)
 	}
+	mobileApp, err := mobile.New(db, initLogger("mobile"))
+	if err != nil {
+		log.Fatalf("error initializing mobile app support: %v", err)
+	}
+	pushNotification.SetMobile(mobileApp)
 	go pushNotification.Run(ctx)
 	go aiAgent.Run(ctx, cmp.Or(ko.Int("ai_agent.worker_count"), 10))
 	go ai.Run(ctx)
@@ -354,6 +361,7 @@ func main() {
 		whatsappTemplate: waTemplates,
 		notificationPref: notificationPreference,
 		pushNotification: pushNotification,
+		mobile:           mobileApp,
 		wsHub:            wsHub,
 	}
 	app.consts.Store(constants)

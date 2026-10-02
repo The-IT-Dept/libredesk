@@ -23,6 +23,11 @@ const (
 func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Authentication.
 	g.POST("/api/v1/auth/login", rateLimit(handleLogin, "auth"))
+
+	// Mobile agent app (fork): device login, Expo push token, sign out.
+	g.POST("/api/v1/mobile/login", rateLimit(handleMobileLogin, "auth"))
+	g.PUT("/api/v1/mobile/push-token", auth(handleMobilePushToken))
+	g.POST("/api/v1/mobile/logout", auth(handleMobileLogout))
 	g.GET("/logout", auth(handleLogout))
 	g.GET("/api/v1/oidc/{id}/login", rateLimit(handleOIDCLogin, "auth"))
 	g.GET("/api/v1/oidc/{id}/finish", rateLimit(handleOIDCCallback, "auth"))

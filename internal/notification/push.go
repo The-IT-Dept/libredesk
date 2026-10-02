@@ -13,6 +13,7 @@ import (
 	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/mobile"
 	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/jmoiron/sqlx"
@@ -41,7 +42,13 @@ type pushSettingStore interface {
 	Update(settings any) error
 }
 
+// MobilePusher delivers notifications to the native agent app (internal/mobile).
+type MobilePusher interface {
+	Push(ctx context.Context, userID int, msg mobile.PushMessage)
+}
+
 type PushManager struct {
+	mobile      MobilePusher
 	store       pushSubscriptionStore
 	lo          *logf.Logger
 	i18n        *i18n.I18n
@@ -89,6 +96,11 @@ func NewPushManager(opts PushManagerOpts) (*PushManager, error) {
 	return m, nil
 }
 
+// SetMobile makes every push also go to the user's mobile app devices.
+func (m *PushManager) SetMobile(mp MobilePusher) {
+	m.mobile = mp
+}
+
 func (m *PushManager) PublicKey() string {
 	return m.publicKey
 }
@@ -129,7 +141,7 @@ func (m *PushManager) Delete(userID int, endpoint string) error {
 }
 
 func (m *PushManager) Send(userID int, payload nmodels.PushPayload) bool {
-	if m.publicKey == "" || m.privateKey == "" {
+	if (m.publicKey == "" || m.privateKey == "") && m.mobile == nil {
 		return false
 	}
 	select {
@@ -169,6 +181,15 @@ func (m *PushManager) deliver(ctx context.Context, delivery pushDelivery) error 
 	}
 	delivery.Payload.Title = pushPreview(delivery.Payload.Title, pushTitleRunes)
 	delivery.Payload.Body = pushPreview(delivery.Payload.Body, pushBodyRunes)
+	if m.mobile != nil {
+		m.mobile.Push(ctx, delivery.UserID, mobile.PushMessage{
+			Title: delivery.Payload.Title, Body: delivery.Payload.Body, Tag: delivery.Payload.Tag,
+			URL: delivery.Payload.URL, ConversationUUID: mobile.ConversationUUID(delivery.Payload.URL),
+		})
+	}
+	if m.publicKey == "" || m.privateKey == "" {
+		return nil
+	}
 	payload, err := json.Marshal(delivery.Payload)
 	if err != nil {
 		return err

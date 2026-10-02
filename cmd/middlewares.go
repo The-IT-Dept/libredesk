@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/abhinavxd/libredesk/internal/mobile"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,6 +20,7 @@ const (
 	authMethodSession   = "session"
 	authMethodSignedURL = "signed_url"
 	authMethodPublic    = "public"
+	authMethodMobile    = "mobile"
 
 	// rateLimitPaidKey holds the rule name a request was already charged for upstream of the router.
 	rateLimitPaidKey = "rate_limit_paid"
@@ -29,6 +31,23 @@ const (
 // For session-based auth, CSRF is checked for POST/PUT/DELETE requests
 func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 	var user models.User
+
+	// Mobile app device token ("Authorization: Bearer ldm_...").
+	if hdr := string(r.RequestCtx.Request.Header.Peek("Authorization")); strings.HasPrefix(hdr, "Bearer "+mobile.TokenPrefix) {
+		device, err := app.mobile.Authenticate(strings.TrimPrefix(hdr, "Bearer "))
+		if err != nil {
+			return user, envelope.NewError(envelope.GeneralError, app.i18n.T("auth.invalidOrExpiredSession"), nil)
+		}
+		if user, err = app.user.GetAgentCachedOrLoad(device.UserID); err != nil {
+			return user, err
+		}
+		if !user.Enabled {
+			return user, envelope.NewError(envelope.PermissionError, app.i18n.T("user.accountDisabled"), nil)
+		}
+		r.RequestCtx.SetUserValue("auth_method", authMethodMobile)
+		r.RequestCtx.SetUserValue("mobile_device_id", device.ID)
+		return user, nil
+	}
 
 	// Check for Authorization header first (API key authentication)
 	apiKey, apiSecret, err := r.ParseAuthHeader(fastglue.AuthBasic | fastglue.AuthToken)
