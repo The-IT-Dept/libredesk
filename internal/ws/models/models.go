@@ -12,6 +12,7 @@ const (
 	MessageTypeError                 = "error"
 	MessageTypeConversationSubscribe = "conversation_subscribe"
 	MessageTypeTyping                = "typing"
+	MessageTypeAgentTyping           = "agent_typing"
 	MessageTypeListSubscribeReplace  = "list_subscribe_replace"
 	MessageTypeAgentAvailability     = "agent_availability_update"
 )

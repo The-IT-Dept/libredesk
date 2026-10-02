@@ -2,6 +2,7 @@
 package ws
 
 import (
+	"encoding/json"
 	"slices"
 	"sync"
 	"time"
@@ -231,6 +232,32 @@ func (h *Hub) BroadcastMessage(msg models.BroadcastMessage) {
 func (h *Hub) BroadcastTypingToConversation(conversationUUID string, typingMsg models.TypingMessage) {
 	if h.conversationStore != nil && !typingMsg.IsPrivateMessage {
 		h.conversationStore.BroadcastTypingToWidgetClientsOnly(conversationUUID, typingMsg.IsTyping)
+	}
+}
+
+// BroadcastAgentTyping relays an agent's typing state to the other agents who have the conversation
+// open, as "agent_typing" with the agent's user ID (fork: the mobile app's collision warning).
+// Upstream only forwards agent typing to livechat widgets.
+func (h *Hub) BroadcastAgentTyping(sender *Client, conversationUUID string, isTyping, isPrivate bool) {
+	data, err := json.Marshal(models.Message{Type: models.MessageTypeAgentTyping, Data: map[string]any{
+		"conversation_uuid":  conversationUUID,
+		"is_typing":          isTyping,
+		"is_private_message": isPrivate,
+		"user_id":            sender.ID,
+	}})
+	if err != nil {
+		return
+	}
+	h.subsMu.RLock()
+	viewers := make([]*Client, 0, len(h.convSubsOpen[conversationUUID]))
+	for c := range h.convSubsOpen[conversationUUID] {
+		if c.ID != sender.ID {
+			viewers = append(viewers, c)
+		}
+	}
+	h.subsMu.RUnlock()
+	for _, c := range viewers {
+		c.SendMessage(data, websocket.TextMessage)
 	}
 }
 

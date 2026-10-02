@@ -174,6 +174,7 @@ func (c *Client) handleTyping(data json.RawMessage) {
 	}
 
 	c.Hub.BroadcastTypingToConversation(typingMsg.ConversationUUID, typingMsg)
+	c.Hub.BroadcastAgentTyping(c, typingMsg.ConversationUUID, typingMsg.IsTyping, typingMsg.IsPrivateMessage)
 }
 
 // close closes the Send channel; it is idempotent.

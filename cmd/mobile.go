@@ -80,3 +80,26 @@ func handleMobileLogout(r *fastglue.Request) error {
 	}
 	return r.SendEnvelope(true)
 }
+
+// iOS app IDs (TEAMID.bundle-id) allowed to open conversation links from this helpdesk, e.g. the
+// links in notification emails. Set with LIBREDESK_MOBILE__IOS_APP_IDS (comma-separated).
+const defaultIOSAppIDs = "W62CSN3S5H.au.theitdept.libredesk"
+
+// handleAppleAppSiteAssociation serves the universal-links file for the mobile app.
+func handleAppleAppSiteAssociation(r *fastglue.Request) error {
+	ids := ko.String("mobile.ios_app_ids")
+	if ids == "" {
+		ids = defaultIOSAppIDs
+	}
+	appIDs := strings.Split(ids, ",")
+	body := map[string]any{
+		"applinks": map[string]any{
+			"details": []map[string]any{{
+				"appIDs":     appIDs,
+				"components": []map[string]string{{"/": "/inboxes/*/conversation/*"}},
+			}},
+		},
+	}
+	r.RequestCtx.SetContentType("application/json")
+	return r.SendJSON(fasthttp.StatusOK, body)
+}

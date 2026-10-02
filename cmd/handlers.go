@@ -440,6 +440,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/widget/assets/{all:*}", serveWidgetStaticFiles)
 	g.GET("/images/{all:*}", serveFrontendStaticFiles)
 	g.GET("/manifest.webmanifest", serveManifest)
+	g.GET("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation)
 	g.GET("/sw.js", serveServiceWorker)
 	g.GET("/static/public/{all:*}", serveStaticFiles)
 
