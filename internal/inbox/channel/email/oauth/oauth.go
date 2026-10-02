@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/microsoft"
 )
@@ -60,6 +61,27 @@ func GetOAuth2Config(provider Provider, clientID, clientSecret, redirectURI stri
 	default:
 		return nil, fmt.Errorf("unsupported OAuth provider: %s", provider)
 	}
+}
+
+// MicrosoftAppScope is the scope requested for app-only (client credentials) access to Exchange
+// Online. The app needs the IMAP.AccessAsApp and SMTP.SendAsApp application permissions, and an
+// Exchange service principal with access to the mailbox.
+const MicrosoftAppScope = "https://outlook.office365.com/.default"
+
+// AppOnlyToken gets an app-only Microsoft token with the client credentials grant. This is how
+// inboxes for shared mailboxes authenticate: they have no user to sign in as, so there is no
+// refresh token.
+func AppOnlyToken(ctx context.Context, clientID, clientSecret, tenantID string) (*oauth2.Token, error) {
+	if tenantID == "" || tenantID == "common" {
+		return nil, fmt.Errorf("app-only Microsoft auth needs a tenant ID")
+	}
+	cfg := &clientcredentials.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		TokenURL:     microsoft.AzureADEndpoint(tenantID).TokenURL,
+		Scopes:       []string{MicrosoftAppScope},
+	}
+	return cfg.Token(ctx)
 }
 
 // ExchangeCodeForToken exchanges an authorization code for access and refresh tokens.

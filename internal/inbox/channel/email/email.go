@@ -235,16 +235,36 @@ func (e *Email) closeSMTPPool() error {
 
 // RefreshOAuthConfig refreshes an expired OAuth token and returns a new OAuth config.
 func RefreshOAuthConfig(currentToken *models.OAuthConfig) (*models.OAuthConfig, error) {
-	if currentToken.RefreshToken == "" {
-		return nil, fmt.Errorf("no refresh token available")
-	}
-
 	clientID := currentToken.ClientID
 	clientSecret := currentToken.ClientSecret
 	tenantID := currentToken.TenantID
 
 	if clientID == "" || clientSecret == "" {
 		return nil, fmt.Errorf("OAuth credentials missing for provider '%s'", currentToken.Provider)
+	}
+
+	// A Microsoft inbox without a refresh token uses app-only auth (for example a shared
+	// mailbox), so get a new token with the client credentials grant.
+	if currentToken.RefreshToken == "" && oauth.Provider(currentToken.Provider) == oauth.ProviderMicrosoft {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		newToken, err := oauth.AppOnlyToken(ctx, clientID, clientSecret, tenantID)
+		if err != nil {
+			return nil, fmt.Errorf("app-only token request failed: %w", err)
+		}
+		return &models.OAuthConfig{
+			Provider:     currentToken.Provider,
+			AccessToken:  newToken.AccessToken,
+			ExpiresAt:    newToken.Expiry,
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+			TenantID:     tenantID,
+		}, nil
+	}
+
+	if currentToken.RefreshToken == "" {
+		return nil, fmt.Errorf("no refresh token available")
 	}
 
 	cfg, err := oauth.GetOAuth2Config(

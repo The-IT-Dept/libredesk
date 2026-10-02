@@ -1,0 +1,9 @@
+# The IT Dept build: the libredesk binary is built (frontend stuffed in) by
+# .github/workflows/theitdept-image.yml before this runs.
+FROM alpine:3.22
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /libredesk
+COPY libredesk .
+COPY config.sample.toml config.toml
+EXPOSE 9000
+CMD ["./libredesk"]
